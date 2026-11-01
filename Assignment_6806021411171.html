@@ -3,319 +3,437 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Animal Segmenter & Detector</title>
-    <!-- โหลดฟอนต์ Kanit / Sarabun และ ONNX Runtime Web -->
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>AI Animal Vision - YOLO26 Segmentation & Detection</title>
+    <!-- โหลด Google Font Inter + Prompt และ ONNX Runtime Web -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
     <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --primary-light: #eef2ff;
+            --surface: #ffffff;
+            --background: #f8fafc;
+            --border: #e2e8f0;
+            --text-main: #0f172a;
+            --text-sub: #64748b;
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Prompt', sans-serif;
-            background-color: #f4f7fb;
-            color: #1e293b;
-            padding: 32px 40px;
+            font-family: 'Prompt', 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--background);
+            color: var(--text-main);
+            padding: 28px 24px;
+            min-height: 100vh;
         }
-        .page-wrapper {
-            max-width: 1220px;
+
+        .app-container {
+            max-width: 1280px;
             margin: 0 auto;
         }
-        h1 {
-            font-size: 46px;
-            font-weight: 700;
-            color: #0f172a;
-            letter-spacing: -0.5px;
-            line-height: 1.15;
-        }
-        .subtitle {
-            color: #64748b;
-            font-size: 16px;
-            margin-top: 6px;
+
+        /* Header Style */
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
             margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 18px;
+            flex-wrap: wrap;
+            gap: 12px;
         }
-        .layout {
+        .header-title h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .badge-live {
+            background: #dcfce7;
+            color: #15803d;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 999px;
+            letter-spacing: 0.5px;
+        }
+        .header-title p {
+            color: var(--text-sub);
+            font-size: 14.5px;
+            margin-top: 4px;
+        }
+
+        /* Layout Grid */
+        .workspace-grid {
             display: grid;
-            grid-template-columns: 310px 1fr;
+            grid-template-columns: 320px 1fr;
             gap: 24px;
             align-items: start;
         }
-        @media (max-width: 900px) {
-            .layout { grid-template-columns: 1fr; }
+        @media (max-width: 960px) {
+            .workspace-grid { grid-template-columns: 1fr; }
         }
-        .card {
-            background: #ffffff;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
-            border: 1px solid #eef2f6;
+
+        /* Panel Card */
+        .panel-card {
+            background: var(--surface);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            padding: 22px;
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
             margin-bottom: 20px;
         }
-        .card-title {
-            font-size: 18px;
+        .panel-header {
+            font-size: 16px;
             font-weight: 600;
             margin-bottom: 14px;
-            color: #0f172a;
-        }
-        .model-status {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Model Selector */
+        .select-custom {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1.5px solid var(--border);
+            font-family: inherit;
+            font-size: 14px;
+            color: var(--text-main);
+            background: #f8fafc;
+            outline: none;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+        .select-custom:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .status-chip {
+            display: flex;
+            align-items: center;
             gap: 8px;
-            font-size: 13.5px;
-            color: #334155;
-            line-height: 1.45;
+            padding: 8px 12px;
+            background: #f1f5f9;
+            border-radius: 10px;
+            font-size: 13px;
+            color: var(--text-sub);
             margin-bottom: 14px;
+            line-height: 1.4;
             word-break: break-all;
         }
-        .dot-status {
-            width: 10px;
-            height: 10px;
+        .chip-dot {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background-color: #10b981;
-            margin-top: 5px;
+            background: #eab308;
             flex-shrink: 0;
         }
-        .dot-status.loading { background-color: #f59e0b; }
-        .dot-status.error { background-color: #ef4444; }
+        .chip-dot.ready { background: #22c55e; }
+        .chip-dot.error { background: #ef4444; }
 
-        .model-select {
-            width: 100%;
-            padding: 8px 10px;
+        /* Range Slider */
+        .slider-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 12px 0 20px;
+        }
+        .slider-box input[type="range"] {
+            flex: 1;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 6px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+        .slider-badge {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 15px;
+            background: var(--primary-light);
+            padding: 4px 10px;
             border-radius: 8px;
-            border: 1px solid #cbd5e1;
-            font-family: inherit;
-            font-size: 13.5px;
-            margin-bottom: 12px;
-            background: #f8fafc;
-            color: #1e293b;
         }
 
-        .btn-pill {
+        /* Class Tag Rows */
+        .class-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .class-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8fafc;
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid #f1f5f9;
+        }
+        .class-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .class-tag-idx {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-sub);
+            width: 14px;
+        }
+        .class-name-input {
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 13.5px;
+            color: var(--text-main);
+            font-weight: 500;
+            outline: none;
+            width: 100%;
+        }
+
+        /* Main Display Zone */
+        .action-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .btn {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            padding: 9px 18px;
-            border-radius: 999px;
+            gap: 6px;
+            padding: 10px 20px;
+            border-radius: 12px;
             font-family: inherit;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            border: 1px solid #dbe2ea;
-            background: #ffffff;
-            color: #1e3a8a;
-            transition: all 0.15s ease;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-main);
+            transition: all 0.2s ease;
         }
-        .btn-pill:hover:not(:disabled) {
+        .btn:hover:not(:disabled) {
             background: #f1f5f9;
+            transform: translateY(-1px);
         }
-        .btn-pill:disabled {
-            opacity: 0.5;
+        .btn:disabled {
+            opacity: 0.45;
             cursor: not-allowed;
         }
         .btn-primary {
-            background: #1d63dc;
+            background: var(--primary);
             color: #ffffff;
-            border-color: #1d63dc;
+            border-color: var(--primary);
         }
         .btn-primary:hover:not(:disabled) {
-            background: #154eb5;
-        }
-        .link-reset {
-            display: inline-block;
-            margin-top: 12px;
-            font-size: 13px;
-            color: #64748b;
-            text-decoration: underline;
-            cursor: pointer;
-            background: none;
-            border: none;
-            font-family: inherit;
-        }
-        .link-reset:hover { color: #0f172a; }
-
-        .setting-label {
-            font-size: 13.5px;
-            color: #64748b;
-            margin-bottom: 8px;
-            display: block;
-        }
-        .slider-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 18px;
-        }
-        .slider-row input[type="range"] {
-            flex: 1;
-            accent-color: #1d63dc;
-            cursor: pointer;
-        }
-        .conf-val {
-            font-weight: 700;
-            color: #1d63dc;
-            font-size: 16px;
-            min-width: 38px;
-            text-align: right;
+            background: var(--primary-hover);
         }
 
-        .class-list {
+        /* Interactive Drop & Paste Canvas Area */
+        .drop-zone {
+            background: var(--surface);
+            border-radius: 24px;
+            border: 2px dashed #cbd5e1;
+            padding: 24px;
+            min-height: 480px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .class-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .class-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .class-idx {
-            font-size: 13.5px;
-            color: #475569;
-            width: 14px;
-            font-family: monospace;
-        }
-        .class-input {
-            flex: 1;
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            background: #f8fafc;
-            font-family: monospace;
-            font-size: 13.5px;
-            color: #0f172a;
-        }
-
-        .top-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-        .canvas-card {
-            background: #ffffff;
-            border-radius: 16px;
-            padding: 16px;
-            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
-            border: 1px solid #eef2f6;
-            min-height: 420px;
-            display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
         }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary);
+            background: #faf5ff;
+        }
+        .drop-zone.dragover {
+            transform: scale(0.995);
+        }
+        .drop-zone-placeholder {
+            text-align: center;
+            pointer-events: none;
+        }
+        .icon-box {
+            width: 64px;
+            height: 64px;
+            background: var(--primary-light);
+            color: var(--primary);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+        }
+        .icon-box svg { width: 32px; height: 32px; stroke-width: 2; }
+        .prompt-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+        .prompt-desc {
+            font-size: 14px;
+            color: var(--text-sub);
+        }
+        .kbd-badge {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-weight: 600;
+            color: var(--text-main);
+            font-size: 12.5px;
+        }
+
         canvas {
             max-width: 100%;
             height: auto;
-            border-radius: 6px;
+            border-radius: 14px;
             display: none;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
         }
-        .empty-hint {
-            color: #94a3b8;
-            font-size: 15px;
-            text-align: center;
-            padding: 60px 20px;
+
+        /* Info Footer Bar */
+        .metrics-bar {
+            margin-top: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 6px;
+            font-size: 14px;
+            color: var(--text-sub);
         }
-        .footer-stats {
-            margin-top: 12px;
-            font-size: 14.5px;
-            color: #475569;
-            padding-left: 4px;
+        .metrics-stat {
+            font-weight: 600;
+            color: var(--text-main);
         }
     </style>
 </head>
 <body>
-    <div class="page-wrapper">
-        <h1>Animal Onpriya_6806021411171</h1>
-        <p class="subtitle">ทายภาพ butterfly, sheep, spider และ squirrel ด้วยโมเดล YOLO26n-seg และ YOLO26n</p>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header-section">
+            <div class="header-title">
+                <h1>Animal Lens AI <span class="badge-live">Client-Side JS</span></h1>
+                <p>โมเดลตรวจจับและระบายสีจำแนกสัตว์ 4 ชนิด (Butterfly, Sheep, Spider, Squirrel)</p>
+            </div>
+            <div style="font-size: 13px; color: var(--text-sub);">
+                💡 คุณสามารถกดคลิกที่หน้าเว็บแล้วกด <kbd class="kbd-badge">Ctrl + V</kbd> เพื่อวางรูปได้ทันที
+            </div>
+        </header>
 
-        <div class="layout">
-            <!-- แถบเมนูด้านซ้าย -->
-            <div class="sidebar">
-                <div class="card">
-                    <div class="card-title">โมเดล</div>
-                    <div class="model-status">
-                        <span id="status-dot" class="dot-status loading"></span>
-                        <span id="status-text">กำลังโหลดโมเดล...</span>
-                    </div>
-
-                    <!-- เลือกสลับระหว่างโมเดล Polygon และ Rectangle ที่มีในโปรเจกต์ -->
-                    <select id="preset-model" class="model-select">
-                        <option value="./best_web_model/best_p.onnx">best_p.onnx (Polygon - Seg)</option>
-                        <option value="./best_web_model/best_r.onnx">best_r.onnx (Rectangle - Det)</option>
+        <div class="workspace-grid">
+            <!-- Sidebar แถบตั้งค่า -->
+            <aside class="sidebar-wrapper">
+                <div class="panel-card">
+                    <div class="panel-header">โมเดลที่ใช้งาน</div>
+                    <select id="preset-model" class="select-custom">
+                        <option value="./best_p.onnx">best_p.onnx (Polygon - Seg)</option>
+                        <option value="./best_r.onnx">best_r.onnx (Rectangle - Det)</option>
                     </select>
 
-                    <!-- ปุ่มเลือกไฟล์ .onnx จากเครื่องเพิ่มเติม -->
+                    <div class="status-chip">
+                        <span id="status-dot" class="chip-dot"></span>
+                        <span id="status-text">กำลังเริ่มต้นเชื่อมต่อโมเดล...</span>
+                    </div>
+
                     <input type="file" id="onnx-upload" accept=".onnx" style="display:none;">
-                    <button class="btn-pill" onclick="document.getElementById('onnx-upload').click()">เลือกไฟล์ .onnx</button>
-                    <br>
-                    <button class="link-reset" id="reset-model-btn">ล้างโมเดลที่จำไว้</button>
+                    <button class="btn" style="width:100%; justify-content:center;" onclick="document.getElementById('onnx-upload').click()">
+                        📁 สลับไฟล์ .onnx จากเครื่อง
+                    </button>
                 </div>
 
-                <div class="card">
-                    <div class="card-title">ตั้งค่าการทาย</div>
-                    <span class="setting-label">ความมั่นใจขั้นต่ำ</span>
-                    <div class="slider-row">
+                <div class="panel-card">
+                    <div class="panel-header">การปรับแต่ง (Parameters)</div>
+                    <label style="font-size: 13px; color: var(--text-sub);">Confidence Threshold</label>
+                    <div class="slider-box">
                         <input type="range" id="conf-slider" min="0.05" max="0.95" step="0.05" value="0.25">
-                        <span class="conf-val" id="conf-value">0.25</span>
+                        <span class="slider-badge" id="conf-value">0.25</span>
                     </div>
 
-                    <span class="setting-label">ชื่อคลาส (ตามลำดับ index ของโมเดล)</span>
-                    <div class="class-list">
-                        <div class="class-item">
-                            <span class="class-dot" style="background:#ef5323;"></span>
-                            <span class="class-idx">0</span>
-                            <input type="text" class="class-input" data-idx="0" value="butterfly">
+                    <label style="font-size: 13px; color: var(--text-sub); margin-bottom: 8px; display:block;">Label Classes</label>
+                    <div class="class-group">
+                        <div class="class-row">
+                            <span class="class-swatch" style="background:#f43f5e;"></span>
+                            <span class="class-tag-idx">0</span>
+                            <input type="text" class="class-name-input" data-idx="0" value="butterfly">
                         </div>
-                        <div class="class-item">
-                            <span class="class-dot" style="background:#2bb673;"></span>
-                            <span class="class-idx">1</span>
-                            <input type="text" class="class-input" data-idx="1" value="sheep">
+                        <div class="class-row">
+                            <span class="class-swatch" style="background:#10b981;"></span>
+                            <span class="class-tag-idx">1</span>
+                            <input type="text" class="class-name-input" data-idx="1" value="sheep">
                         </div>
-                        <div class="class-item">
-                            <span class="class-dot" style="background:#facc15;"></span>
-                            <span class="class-idx">2</span>
-                            <input type="text" class="class-input" data-idx="2" value="spider">
+                        <div class="class-row">
+                            <span class="class-swatch" style="background:#f59e0b;"></span>
+                            <span class="class-tag-idx">2</span>
+                            <input type="text" class="class-name-input" data-idx="2" value="spider">
                         </div>
-                        <div class="class-item">
-                            <span class="class-dot" style="background:#6366f1;"></span>
-                            <span class="class-idx">3</span>
-                            <input type="text" class="class-input" data-idx="3" value="squirrel">
+                        <div class="class-row">
+                            <span class="class-swatch" style="background:#6366f1;"></span>
+                            <span class="class-tag-idx">3</span>
+                            <input type="text" class="class-name-input" data-idx="3" value="squirrel">
                         </div>
                     </div>
                 </div>
-            </div>
+            </aside>
 
-            <!-- พื้นที่แสดงผลด้านขวา -->
-            <div class="main-area">
-                <div class="top-actions">
+            <!-- Main Area -->
+            <main class="main-content">
+                <div class="action-toolbar">
                     <input type="file" id="image-upload" accept="image/*" style="display:none;">
-                    <button class="btn-pill btn-primary" id="btn-choose-img" onclick="document.getElementById('image-upload').click()" disabled>เลือกรูป</button>
-                    <button class="btn-pill" id="btn-rerun" disabled>ทายอีกครั้ง</button>
-                    <button class="btn-pill" id="btn-save-img" disabled>บันทึกรูปผลลัพธ์</button>
+                    <button class="btn btn-primary" id="btn-browse" onclick="document.getElementById('image-upload').click()" disabled>
+                        🖼️ เลือกรูปภาพ
+                    </button>
+                    <button class="btn" id="btn-rerun" disabled>🔄 ทายผลใหม่</button>
+                    <button class="btn" id="btn-save-img" disabled>💾 บันทึกรูปผลลัพธ์</button>
+                    <button class="btn" id="btn-save-json" disabled>{ } Export JSON</button>
                 </div>
 
-                <div class="canvas-card">
-                    <div id="empty-hint" class="empty-hint">กดปุ่ม <b>"เลือกรูป"</b> ด้านบนเพื่ออัปโหลดภาพสัตว์ที่ต้องการทายผล</div>
+                <!-- พื้นที่ Drop zone ที่รองรับ Paste (Ctrl+V) / Drag & Drop / Click -->
+                <div class="drop-zone" id="drop-zone" tabindex="0">
+                    <div id="drop-placeholder" class="drop-zone-placeholder">
+                        <div class="icon-box">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        </div>
+                        <div class="prompt-title">วางรูปภาพที่นี่ หรือกดคลิกเพื่อเลือกไฟล์</div>
+                        <div class="prompt-desc">
+                            สามารถลากไฟล์มาวาง หรือแคปรูปแล้วกด <kbd class="kbd-badge">Ctrl + V</kbd> เพื่อวิเคราะห์ได้ทันที
+                        </div>
+                    </div>
                     <canvas id="canvas"></canvas>
                 </div>
 
-                <div class="footer-stats" id="footer-stats">ยังไม่ได้เลือกรูปภาพ</div>
-            </div>
+                <div class="metrics-bar">
+                    <div id="metrics-output">พร้อมสำหรับการประมวลผล</div>
+                    <div style="font-size: 13px;">Inference with ONNX Runtime Web</div>
+                </div>
+            </main>
         </div>
     </div>
 
     <script>
-        // สีประจำแต่ละคลาส (ตรงกับจุดสีด้านซ้าย)
         const COLORS = [
-            [239, 83, 35],   // 0: ส้มแดง (butterfly)
-            [43, 182, 115],  // 1: เขียว (sheep)
-            [250, 204, 21],  // 2: เหลือง (spider)
-            [99, 102, 241]   // 3: ม่วงน้ำเงิน (squirrel)
+            [244, 63, 94],   // 0: ชมพูเข้ม (butterfly)
+            [16, 185, 129],  // 1: เขียว Emerald (sheep)
+            [245, 158, 11],  // 2: ส้มอำพัน (spider)
+            [99, 102, 241]   // 3: น้ำเงินคราม (squirrel)
         ];
 
         let session = null;
@@ -326,92 +444,67 @@
         const statusText = document.getElementById('status-text');
         const presetModelEl = document.getElementById('preset-model');
         const onnxUploadEl = document.getElementById('onnx-upload');
-        const resetModelBtn = document.getElementById('reset-model-btn');
         const confSlider = document.getElementById('conf-slider');
         const confValue = document.getElementById('conf-value');
         const imageUploadEl = document.getElementById('image-upload');
-        const btnChooseImg = document.getElementById('btn-choose-img');
+        const btnBrowse = document.getElementById('btn-browse');
         const btnRerun = document.getElementById('btn-rerun');
         const btnSaveImg = document.getElementById('btn-save-img');
         const btnSaveJson = document.getElementById('btn-save-json');
+        const dropZone = document.getElementById('drop-zone');
+        const dropPlaceholder = document.getElementById('drop-placeholder');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const emptyHint = document.getElementById('empty-hint');
-        const footerStats = document.getElementById('footer-stats');
+        const metricsOutput = document.getElementById('metrics-output');
 
         function getClassNames() {
-            const inputs = document.querySelectorAll('.class-input');
-            return Array.from(inputs).map(el => el.value.trim() || `class_${el.dataset.idx}`);
+            return Array.from(document.querySelectorAll('.class-name-input')).map(el => el.value.trim() || `class_${el.dataset.idx}`);
         }
 
-        // 1. ฟังก์ชันโหลดโมเดล (รองรับทั้ง Path และ ArrayBuffer จากไฟล์ที่เลือกเอง)
+        // 1. โหลดโมเดล
         async function loadModel(source, displayName) {
-            statusDot.className = 'dot-status loading';
+            statusDot.className = 'chip-dot';
             statusText.innerText = `กำลังโหลด: ${displayName}...`;
-            btnChooseImg.disabled = true;
+            btnBrowse.disabled = true;
             try {
                 session = await ort.InferenceSession.create(source);
-                const outputs = session.outputNames.join(', ');
-                statusDot.className = 'dot-status';
-                statusText.innerText = `โหลดแล้ว: ${displayName} | outputs: ${outputs}`;
-                btnChooseImg.disabled = false;
-
-                if (currentImage) {
-                    runInference(currentImage);
-                }
+                statusDot.className = 'chip-dot ready';
+                statusText.innerText = `พร้อมใช้งาน: ${displayName}`;
+                btnBrowse.disabled = false;
+                if (currentImage) runInference(currentImage);
             } catch (err) {
-                statusDot.className = 'dot-status error';
-                statusText.innerText = `โหลดไม่สำเร็จ (${displayName}) กรุณาตรวจสอบไฟล์โมเดล`;
+                statusDot.className = 'chip-dot error';
+                statusText.innerText = `ไม่สามารถโหลดโมเดลได้ (${displayName})`;
                 console.error(err);
             }
         }
 
-        // โหลดโมเดลเริ่มต้นตามที่เลือกไว้
         loadModel(presetModelEl.value, 'best_p.onnx');
 
-        // เมื่อเปลี่ยนโมเดลจาก Dropdown
         presetModelEl.addEventListener('change', (e) => {
             const name = e.target.value.split('/').pop();
             loadModel(e.target.value, name);
         });
 
-        // เมื่อกดปุ่ม "เลือกไฟล์ .onnx" จากเครื่อง
         onnxUploadEl.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            const buffer = await file.arrayBuffer();
-            loadModel(buffer, file.name);
+            loadModel(await file.arrayBuffer(), file.name);
         });
 
-        // เมื่อกด "ล้างโมเดลที่จำไว้" ให้กลับไปโหลดค่าเริ่มต้น
-        resetModelBtn.addEventListener('click', () => {
-            presetModelEl.selectedIndex = 0;
-            loadModel(presetModelEl.value, 'best_p.onnx');
+        confSlider.addEventListener('input', (e) => confValue.innerText = parseFloat(e.target.value).toFixed(2));
+        confSlider.addEventListener('change', () => { if (currentImage && session) runInference(currentImage); });
+        document.querySelectorAll('.class-name-input').forEach(input => {
+            input.addEventListener('change', () => { if (currentImage && session) runInference(currentImage); });
         });
 
-        // อัปเดตตัวเลขความมั่นใจขั้นต่ำ
-        confSlider.addEventListener('input', (e) => {
-            confValue.innerText = parseFloat(e.target.value).toFixed(2);
-        });
-        confSlider.addEventListener('change', () => {
-            if (currentImage && session) runInference(currentImage);
-        });
-
-        // เมื่อแก้ไขชื่อคลาส ให้วาดผลใหม่ทันที
-        document.querySelectorAll('.class-input').forEach(input => {
-            input.addEventListener('change', () => {
-                if (currentImage && session) runInference(currentImage);
-            });
-        });
-
-        // 2. เมื่อเลือกรูปภาพ
-        imageUploadEl.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+        // 2. ฟังก์ชันจัดการการโหลดรูปภาพ
+        function handleImageFile(file) {
+            if (!file || !file.type.startsWith('image/')) return;
             const img = new Image();
             img.onload = () => {
                 currentImage = img;
-                emptyHint.style.display = 'none';
+                dropPlaceholder.style.display = 'none';
                 canvas.style.display = 'block';
                 btnRerun.disabled = false;
                 btnSaveImg.disabled = false;
@@ -419,36 +512,64 @@
                 runInference(img);
             };
             img.src = URL.createObjectURL(file);
+        }
+
+        // รองรับการคลิกเลือกไฟล์ปกติ
+        imageUploadEl.addEventListener('change', (e) => handleImageFile(e.target.files[0]));
+
+        // ⭐ รองรับการกด CTRL + V จาก Clipboard ทั่วทั้งหน้าเว็บ
+        window.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    const blob = item.getAsFile();
+                    handleImageFile(blob);
+                    break;
+                }
+            }
         });
 
-        // ปุ่ม "ทายอีกครั้ง"
-        btnRerun.addEventListener('click', () => {
-            if (currentImage && session) runInference(currentImage);
+        // ⭐ รองรับ Drag & Drop ลากรูปมาวาง
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleImageFile(e.dataTransfer.files[0]);
+            }
         });
 
-        // ปุ่ม "บันทึกรูปผลลัพธ์"
+        // คลิกที่พื้นที่ Drop Zone เพื่อเลือกรูปได้หากยังไม่มีรูป
+        dropZone.addEventListener('click', (e) => {
+            if (!currentImage && e.target !== canvas) {
+                imageUploadEl.click();
+            }
+        });
+
+        btnRerun.addEventListener('click', () => { if (currentImage && session) runInference(currentImage); });
         btnSaveImg.addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.download = 'prediction_result.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+            const a = document.createElement('a');
+            a.download = 'animal_ai_result.png';
+            a.href = canvas.toDataURL('image/png');
+            a.click();
         });
-
-        // ปุ่ม "บันทึก polygon (JSON)"
         btnSaveJson.addEventListener('click', () => {
             const blob = new Blob([JSON.stringify(lastPredictionsJSON, null, 2)], { type: 'application/json' });
-            const link = document.createElement('a');
-            link.download = 'predictions_polygon.json';
-            link.href = URL.createObjectURL(blob);
-            link.click();
+            const a = document.createElement('a');
+            a.download = 'polygons_output.json';
+            a.href = URL.createObjectURL(blob);
+            a.click();
         });
 
-        // 3. ประมวลผลภาพและจับเวลา
+        // 3. ประมวลผล AI Inference
         async function runInference(img) {
-            footerStats.innerText = 'กำลังประมวลผล...';
+            metricsOutput.innerText = 'กำลังประมวลผล...';
             const t0 = performance.now();
 
-            // เตรียม Canvas ขนาด 640x640 สำหรับป้อนเข้าโมเดล YOLO
             const offCanvas = document.createElement('canvas');
             offCanvas.width = 640;
             offCanvas.height = 640;
@@ -464,19 +585,18 @@
             }
 
             const tensor = new ort.Tensor('float32', input, [1, 3, 640, 640]);
-            const feeds = { [session.inputNames[0]]: tensor };
-            const results = await session.run(feeds);
+            const results = await session.run({ [session.inputNames[0]]: tensor });
 
             const output0Tensor = results[session.outputNames[0]];
             const protoTensor = session.outputNames.length > 1 ? results[session.outputNames[1]] : null;
 
             const count = drawResults(img, output0Tensor, protoTensor);
-            const elapsedMs = Math.round(performance.now() - t0);
+            const timeMs = Math.round(performance.now() - t0);
 
-            footerStats.innerText = `พบ ${count} วัตถุ ใช้เวลา ${elapsedMs} ms`;
+            metricsOutput.innerHTML = `ตรวจพบ <span class="metrics-stat">${count}</span> วัตถุ | เวลาที่ใช้ <span class="metrics-stat">${timeMs} ms</span>`;
         }
 
-        // 4. วาดภาพตามสัดส่วนจริง พร้อมระบายสี Mask และกรอบ Bounding Box
+        // 4. วาดผลลัพธ์
         function drawResults(img, output0Tensor, protoTensor) {
             const confThreshold = parseFloat(confSlider.value);
             const classNames = getClassNames();
@@ -484,8 +604,7 @@
             const dims = output0Tensor.dims;
             const proto = protoTensor ? protoTensor.data : null;
 
-            // ตั้งขนาด Canvas ให้คงสัดส่วนภาพจริง (ความกว้างสูงสุด 900px เพื่อความคมชัดและรวดเร็ว)
-            const maxW = 900;
+            const maxW = 920;
             const scale = img.naturalWidth > maxW ? maxW / img.naturalWidth : 1;
             const dispW = Math.round(img.naturalWidth * scale);
             const dispH = Math.round(img.naturalHeight * scale);
@@ -496,7 +615,6 @@
 
             let selected = [];
 
-            // แกะพิกัดจาก Tensor (รองรับทั้ง YOLO26 End-to-End [1, 300, 6/38] และ [1, C, 8400])
             if (dims[1] === 300) {
                 const stride = dims[2];
                 for (let i = 0; i < 300; i++) {
@@ -510,73 +628,53 @@
                         const classId = Math.round(output0[offset + 5]);
                         const maskWeights = [];
                         if (proto && stride >= 38) {
-                            for (let m = 0; m < 32; m++) {
-                                maskWeights.push(output0[offset + 6 + m]);
-                            }
+                            for (let m = 0; m < 32; m++) maskWeights.push(output0[offset + 6 + m]);
                         }
                         selected.push({ x1, y1, x2, y2, score, classId, maskWeights });
                     }
                 }
             } else {
                 const numAnchors = dims[2];
-                const numClasses = 4;
                 const boxes = [];
-
                 for (let i = 0; i < numAnchors; i++) {
                     let maxScore = 0;
                     let classId = 0;
-                    for (let c = 0; c < numClasses; c++) {
+                    for (let c = 0; c < 4; c++) {
                         const score = output0[(4 + c) * numAnchors + i];
-                        if (score > maxScore) {
-                            maxScore = score;
-                            classId = c;
-                        }
+                        if (score > maxScore) { maxScore = score; classId = c; }
                     }
-
                     if (maxScore >= confThreshold) {
                         const cx = output0[0 * numAnchors + i];
                         const cy = output0[1 * numAnchors + i];
                         const w = output0[2 * numAnchors + i];
                         const h = output0[3 * numAnchors + i];
-                        const x1 = cx - w / 2;
-                        const y1 = cy - h / 2;
-                        const x2 = cx + w / 2;
-                        const y2 = cy + h / 2;
-
                         const maskWeights = [];
                         if (proto) {
-                            for (let m = 0; m < 32; m++) {
-                                maskWeights.push(output0[(8 + m) * numAnchors + i]);
-                            }
+                            for (let m = 0; m < 32; m++) maskWeights.push(output0[(8 + m) * numAnchors + i]);
                         }
-                        boxes.push({ x1, y1, x2, y2, score: maxScore, classId, maskWeights });
+                        boxes.push({ x1: cx - w/2, y1: cy - h/2, x2: cx + w/2, y2: cy + h/2, score: maxScore, classId, maskWeights });
                     }
                 }
-
                 boxes.sort((a, b) => b.score - a.score);
                 while (boxes.length > 0) {
                     const current = boxes.shift();
                     selected.push(current);
                     for (let i = boxes.length - 1; i >= 0; i--) {
-                        if (iou(current, boxes[i]) > 0.45) {
-                            boxes.splice(i, 1);
-                        }
+                        if (iou(current, boxes[i]) > 0.45) boxes.splice(i, 1);
                     }
                 }
             }
 
             lastPredictionsJSON = [];
 
-            // วาดระบายสี Segmentation Mask และเก็บพิกัด Polygon
+            // วาด Segmentation Mask
             if (proto && selected.length > 0) {
                 const canvasData = ctx.getImageData(0, 0, dispW, dispH);
                 const pixels = canvasData.data;
 
                 for (const det of selected) {
                     if (det.maskWeights.length === 0) continue;
-                    const color = COLORS[det.classId] || [239, 83, 35];
-
-                    // คำนวณ Mask ขนาด 160x160 เฉพาะในกรอบของวัตถุ
+                    const color = COLORS[det.classId] || [79, 70, 229];
                     const mx1 = Math.max(0, Math.floor(det.x1 / 4));
                     const my1 = Math.max(0, Math.floor(det.y1 / 4));
                     const mx2 = Math.min(160, Math.ceil(det.x2 / 4));
@@ -589,36 +687,25 @@
                         for (let px = mx1; px < mx2; px++) {
                             let sum = 0;
                             const protoIdx = py * 160 + px;
-                            for (let m = 0; m < 32; m++) {
-                                sum += det.maskWeights[m] * proto[m * 25600 + protoIdx];
-                            }
-                            if (1 / (1 + Math.exp(-sum)) > 0.5) {
-                                maskGrid[ protoIdx ] = 1;
-                            }
+                            for (let m = 0; m < 32; m++) sum += det.maskWeights[m] * proto[m * 25600 + protoIdx];
+                            if (1 / (1 + Math.exp(-sum)) > 0.5) maskGrid[protoIdx] = 1;
                         }
                     }
 
-                    // เก็บจุดขอบ Polygon สำหรับส่งออกไฟล์ JSON
                     for (let py = my1; py < my2; py++) {
                         for (let px = mx1; px < mx2; px++) {
                             if (maskGrid[py * 160 + px] === 1) {
                                 const isEdge = (px === mx1 || px === mx2 - 1 || py === my1 || py === my2 - 1 ||
-                                    maskGrid[py * 160 + (px - 1)] === 0 ||
-                                    maskGrid[py * 160 + (px + 1)] === 0 ||
-                                    maskGrid[(py - 1) * 160 + px] === 0 ||
-                                    maskGrid[(py + 1) * 160 + px] === 0);
+                                    maskGrid[py * 160 + (px - 1)] === 0 || maskGrid[py * 160 + (px + 1)] === 0 ||
+                                    maskGrid[(py - 1) * 160 + px] === 0 || maskGrid[(py + 1) * 160 + px] === 0);
                                 if (isEdge) {
-                                    polygonPoints.push([
-                                        Math.round((px / 160) * dispW),
-                                        Math.round((py / 160) * dispH)
-                                    ]);
+                                    polygonPoints.push([Math.round((px / 160) * dispW), Math.round((py / 160) * dispH)]);
                                 }
                             }
                         }
                     }
                     det.polygon = polygonPoints;
 
-                    // ระบายสี Mask ลงบนภาพตามสัดส่วนจริง
                     const sx1 = Math.max(0, Math.floor((det.x1 / 640) * dispW));
                     const sy1 = Math.max(0, Math.floor((det.y1 / 640) * dispH));
                     const sx2 = Math.min(dispW, Math.ceil((det.x2 / 640) * dispW));
@@ -630,9 +717,9 @@
                             const px = Math.min(159, Math.floor((x / dispW) * 160));
                             if (maskGrid[py * 160 + px] === 1) {
                                 const idx = (y * dispW + x) * 4;
-                                pixels[idx] = Math.round(pixels[idx] * 0.55 + color[0] * 0.45);
-                                pixels[idx + 1] = Math.round(pixels[idx + 1] * 0.55 + color[1] * 0.45);
-                                pixels[idx + 2] = Math.round(pixels[idx + 2] * 0.55 + color[2] * 0.45);
+                                pixels[idx] = Math.round(pixels[idx] * 0.5 + color[0] * 0.5);
+                                pixels[idx + 1] = Math.round(pixels[idx + 1] * 0.5 + color[1] * 0.5);
+                                pixels[idx + 2] = Math.round(pixels[idx + 2] * 0.5 + color[2] * 0.5);
                             }
                         }
                     }
@@ -640,11 +727,10 @@
                 ctx.putImageData(canvasData, 0, 0);
             }
 
-            // วาดกรอบสี่เหลี่ยมและป้ายชื่อคลาสสไตล์เดียวกับภาพตัวอย่าง
+            // วาดกรอบ Bounding Box สไตล์โมเดิร์น
             for (const det of selected) {
-                const color = COLORS[det.classId] || [239, 83, 35];
+                const color = COLORS[det.classId] || [79, 70, 229];
                 const rgb = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-                const rgbaBg = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.85)`;
 
                 const bx1 = (det.x1 / 640) * dispW;
                 const by1 = (det.y1 / 640) * dispH;
@@ -655,17 +741,17 @@
                 ctx.lineWidth = 2.5;
                 ctx.strokeRect(bx1, by1, bw, bh);
 
-                const clsName = classNames[det.classId] || `class_${det.classId}`;
-                const label = `${clsName} ${det.score.toFixed(2)}`;
-                ctx.font = '600 15px Prompt, sans-serif';
+                const clsName = classNames[det.classId] || `Class ${det.classId}`;
+                const label = `${clsName} ${(det.score * 100).toFixed(0)}%`;
+                ctx.font = '600 13.5px "Plus Jakarta Sans", Prompt, sans-serif';
                 const textW = ctx.measureText(label).width;
 
-                const labelY = by1 > 28 ? by1 - 28 : by1;
-                ctx.fillStyle = rgbaBg;
-                ctx.fillRect(bx1, labelY, textW + 14, 26);
+                const labelY = by1 > 26 ? by1 - 26 : by1;
+                ctx.fillStyle = rgb;
+                ctx.fillRect(bx1, labelY, textW + 12, 24);
 
-                ctx.fillStyle = '#0f172a';
-                ctx.fillText(label, bx1 + 7, labelY + 18);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(label, bx1 + 6, labelY + 16);
 
                 lastPredictionsJSON.push({
                     class_id: det.classId,
